@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """
-Modified version of nanogpt_log_losses_adana.py to use fineweb-edu dataset
+Modified version of nanogpt_log_losses_adana.py to use fineweb dataset
 with validation evaluation and plotting.
 """
 
@@ -20,6 +20,9 @@ import pandas as pd
 from typing import Dict, List, Any
 from tqdm import tqdm
 from dataclasses import dataclass
+from huggingface_hub import snapshot_download
+import shutil
+import wandb
 
 # Try to import directly
 from nanogpt_minimal import ModelConfig, TextDataset, init_train_state, train_step, count_params, GPT
@@ -199,7 +202,7 @@ class FineWebDataset:
             del df
 
 def parse_args():
-    parser = argparse.ArgumentParser(description="Train nanogpt with fineweb-edu dataset")
+    parser = argparse.ArgumentParser(description="Train nanogpt with fineweb dataset")
     parser.add_argument(
         "--train_steps", type=int, default=10000,
         help="Number of training steps"
@@ -223,6 +226,10 @@ def parse_args():
     parser.add_argument(
         "--grad_clip", type=float, default=2.0,
         help="Gradient clipping value"
+    )
+    parser.add_argument(
+        "--weight_decay", type=float, default=0.0,
+        help="Weight decay value"
     )
     parser.add_argument(
         "--init_std", type=float, default=0.02,
@@ -316,7 +323,7 @@ def create_learning_curve_plot(step_numbers, train_losses, val_losses, num_param
     ax.set_xlabel('Training Tokens')
     ax.set_ylabel('Loss')
     ax.set_ylim(min(min(train_loss_values), min(val_loss_values)) * 0.9, 12)
-    ax.set_title(f'NanoGPT Language Model Learning Curve (FineWeb-Edu)\n{num_params:,} parameters')
+    ax.set_title(f'NanoGPT Language Model Learning Curve (FineWeb)\n{num_params:,} parameters')
     
     # Convert x-axis to better format
     def format_tokens(x, pos):
@@ -354,7 +361,7 @@ def create_learning_curve_plot(step_numbers, train_losses, val_losses, num_param
 
 def modify_nanogpt_for_fineweb():
     """
-    Train NanoGPT with fineweb-edu dataset and validation evaluation.
+    Train NanoGPT with fineweb dataset and validation evaluation.
     """
     args = parse_args()
     
@@ -375,6 +382,7 @@ def modify_nanogpt_for_fineweb():
         "val_batch_size": args.val_batch_size,
         "val_max_tokens": val_max_tokens,
         "grad_clip": args.grad_clip,
+        "weight_decay": args.weight_decay,
         "init_std": args.init_std,
         "results_dir": args.results_dir,
         "dana_g2": args.dana_g2,
@@ -400,6 +408,7 @@ def modify_nanogpt_for_fineweb():
     dana = optimizers.dana_optimizer(g1=g1, g2=g2, g3=g3, Delta=Delta)
     
     dana = optax.chain(
+        optax.add_decayed_weights(config['weight_decay']),
         optax.clip_by_global_norm(config['grad_clip']),
         dana
     )
@@ -418,7 +427,7 @@ def modify_nanogpt_for_fineweb():
         tx=optimizer)
     
     # Get parquet files and split for train/val
-    data_root = os.path.expanduser("./fineweb-edu/sample/10BT")
+    data_root = os.path.expanduser("~/scratch/fineweb/sample/10BT")
     #data_root = os.path.expanduser("~/fineweb-edu/sample/10BT")
 
     parquet_files = sorted(glob.glob(os.path.join(data_root, "*_00000.parquet")))
@@ -428,9 +437,9 @@ def modify_nanogpt_for_fineweb():
         
     logger.info(f"Found {len(parquet_files)} parquet files")
     
-    # Reserve the first file for validation, rest for training
-    val_files = parquet_files[:1]
-    train_files = parquet_files[1:]
+    # Reserve the last file for validation, rest for training
+    val_files = parquet_files[-1:]
+    train_files = parquet_files[:-1]
     
     logger.info(f"Using {len(train_files)} files for training")
     logger.info(f"Using {len(val_files)} files for validation")
@@ -456,6 +465,20 @@ def modify_nanogpt_for_fineweb():
     # Training loop with loss logging
     pbar = tqdm(range(config["train_steps"]), desc="Training")
     start_time = time.time()
+
+    run_name = f"gpt2_dana_fineweb_steps_{config['train_steps']}_bs_{config['batch_size']}_seq_{config['seq_len']}_g2_{config['dana_g2']}_g3iv_{config['dana_g3_iv']}_g3p_{config['dana_g3_p']}_weight_decay_{config['weight_decay']}"
+    # Initialize wandb
+    wandb.init(project="gpt2-fineweb", 
+               name = run_name, 
+               config={
+        "model": "gpt2",
+        "dataset": "fineweb-10BT",
+        "batch_size": config["batch_size"],
+        "seq_len": config["seq_len"],
+        "dana_g2": config["dana_g2"],
+        "dana_g3_iv": config["dana_g3_iv"],
+        "dana_g3_p": config["dana_g3_p"]
+    })
     
     for step in pbar:
         # Get next batch
@@ -466,6 +489,12 @@ def modify_nanogpt_for_fineweb():
         
         # Update progress bar
         pbar.set_postfix(loss=f"{loss:.4f}")
+        
+        # Log loss to wandb at every step
+        wandb.log({
+            "step": step,
+            "train_loss": float(loss)
+        })
         
         # Log metrics at specified steps
         if step in LOG_STEPS:
@@ -479,6 +508,14 @@ def modify_nanogpt_for_fineweb():
             metrics_history['tokens_processed'].append(total_tokens)
             metrics_history['time_elapsed'].append(time.time() - start_time)
             
+            # Log additional metrics to wandb
+            wandb.log({
+                "val_loss": float(val_loss),
+                "tokens_processed": total_tokens,
+                "time_elapsed": time.time() - start_time,
+                "tokens_per_second": total_tokens / (time.time() - start_time) if (time.time() - start_time) > 0 else 0
+            })
+            
             # Print detailed metrics
             elapsed = time.time() - start_time
             average_tokens_per_second = total_tokens / elapsed
@@ -489,11 +526,22 @@ def modify_nanogpt_for_fineweb():
             tqdm.write(f"  Tokens: {total_tokens:,} ({average_tokens_per_second:.1f} tokens/s)")
             tqdm.write(f"  G2: {config['dana_g2']}, G3_iv: {config['dana_g3_iv']}, g3p: {config['dana_g3_p']}\n")
     
-    # Create CHECKPOINTS directory
-    os.makedirs("CHECKPOINTS", exist_ok=True)
+    # Close wandb run
+    wandb.finish()
+    
+    # Create CHECKPOINTS directory in scratch
+    checkpoint_dir = os.path.expanduser("~/scratch/checkpoints")
+    os.makedirs(checkpoint_dir, exist_ok=True)
     
     # Save model parameters
-    checkpoint_path = f"CHECKPOINTS/model_dana_fineweb_step_{config['train_steps']}.pkl"
+    checkpoint_path = os.path.join(
+        checkpoint_dir,
+        f"model_dana_fineweb_step_{config['train_steps']}_"
+        f"bs_{config['batch_size']}_"
+        f"seq_{config['seq_len']}_"
+        f"weight_decay_{config['weight_decay']}_"
+        f"g2_{config['dana_g2']}_g3iv_{config['dana_g3_iv']}_g3p_{config['dana_g3_p']}.pkl"
+    )
     with open(checkpoint_path, 'wb') as f:
         pickle.dump(state.params, f)
     print(f"Saved checkpoint to {checkpoint_path}")
@@ -515,10 +563,12 @@ def modify_nanogpt_for_fineweb():
     }
     
     timestamp = time.strftime("%Y%m%d_%H%M%S")
-    metrics_filename = (
-        f"{config['results_dir']}/nanogpt_dana_fineweb_metrics_{timestamp}_"
+    metrics_filename = os.path.join(
+        config['results_dir'],
+        f"nanogpt_dana_fineweb_metrics_{timestamp}_"
         f"steps_{config['train_steps']}_bs_{config['batch_size']}_"
         f"seq_{config['seq_len']}_"
+        f"weight_decay_{config['weight_decay']}_"
         f"g2_{config['dana_g2']}_delta_{config['dana_delta']}_g3iv_{config['dana_g3_iv']}_"
         f"g3sv_{config['dana_g3_sv']}_g3p_{config['dana_g3_p']}_g3ts_{config['dana_g3_ts']}.pkl"
     )
