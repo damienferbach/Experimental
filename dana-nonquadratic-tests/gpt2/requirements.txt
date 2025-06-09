@@ -1,0 +1,10 @@
+datasets
+jax
+flax
+optax
+tiktoken
+tqdm
+pandas
+matplotlib
+huggingface-hub
+scipy
