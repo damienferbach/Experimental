@@ -427,7 +427,10 @@ def modify_nanogpt_for_fineweb():
         tx=optimizer)
     
     # Get parquet files and split for train/val
-    data_root = os.path.expanduser("~/scratch/fineweb/sample/10BT")
+    #TAMIA CLUSTER
+    data_root = "/scratch/d/dferbach/fineweb/sample/10BT"
+    #MILA CLUSTER
+    #data_root = os.path.expanduser("~/scratch/fineweb/sample/10BT")
     #data_root = os.path.expanduser("~/fineweb-edu/sample/10BT")
 
     parquet_files = sorted(glob.glob(os.path.join(data_root, "*_00000.parquet")))
@@ -530,7 +533,10 @@ def modify_nanogpt_for_fineweb():
     wandb.finish()
     
     # Create CHECKPOINTS directory in scratch
-    checkpoint_dir = os.path.expanduser("~/scratch/checkpoints")
+    #TAMIA CLUSTER
+    checkpoint_dir = "/scratch/d/dferbach/checkpoints"
+    #MILA CLUSTER
+    #checkpoint_dir = os.path.expanduser("~/scratch/checkpoints")
     os.makedirs(checkpoint_dir, exist_ok=True)
     
     # Save model parameters
