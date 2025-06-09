@@ -3,9 +3,9 @@ import shutil
 import os
 
 #TAMIA CLUSTER
-local_dir = "/scratch/d/dferbach/fineweb/"
+#local_dir = "/scratch/d/dferbach/fineweb/"
 #MILA CLUSTER
-#local_dir = "../../../../scratch/fineweb/"
+local_dir = "../../../../scratch/fineweb/"
 
 # Remove directory if it exists
 if os.path.exists(local_dir):
