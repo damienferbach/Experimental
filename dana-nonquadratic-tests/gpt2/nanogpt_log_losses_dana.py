@@ -408,8 +408,8 @@ def modify_nanogpt_for_fineweb():
     dana = optimizers.dana_optimizer(g1=g1, g2=g2, g3=g3, Delta=Delta)
     
     dana = optax.chain(
-        optax.add_decayed_weights(config['weight_decay']),
         optax.clip_by_global_norm(config['grad_clip']),
+        optax.add_decayed_weights(config['weight_decay'] * config['dana_g2']), # Multiplies by g2 to get correct scale of weight decay
         dana
     )
     optimizer = dana
@@ -466,7 +466,7 @@ def modify_nanogpt_for_fineweb():
     pbar = tqdm(range(config["train_steps"]), desc="Training")
     start_time = time.time()
 
-    run_name = f"gpt2_dana_fineweb_steps_{config['train_steps']}_bs_{config['batch_size']}_seq_{config['seq_len']}_g2_{config['dana_g2']}_g3iv_{config['dana_g3_iv']}_g3p_{config['dana_g3_p']}_weight_decay_{config['weight_decay']}"
+    run_name = f"gpt2_dana_fineweb_steps_{config['train_steps']}_bs_{config['batch_size']}_seq_{config['seq_len']}_g2_{config['dana_g2']}_g3iv_{config['dana_g3_iv']}_g3p_{config['dana_g3_p']}_wd_{config['weight_decay']}"
     # Initialize wandb
     wandb.init(project="gpt2-fineweb", 
                name = run_name, 
@@ -539,7 +539,7 @@ def modify_nanogpt_for_fineweb():
         f"model_dana_fineweb_step_{config['train_steps']}_"
         f"bs_{config['batch_size']}_"
         f"seq_{config['seq_len']}_"
-        f"weight_decay_{config['weight_decay']}_"
+        f"wd_{config['weight_decay']}_"
         f"g2_{config['dana_g2']}_g3iv_{config['dana_g3_iv']}_g3p_{config['dana_g3_p']}.pkl"
     )
     with open(checkpoint_path, 'wb') as f:
@@ -568,7 +568,7 @@ def modify_nanogpt_for_fineweb():
         f"nanogpt_dana_fineweb_metrics_{timestamp}_"
         f"steps_{config['train_steps']}_bs_{config['batch_size']}_"
         f"seq_{config['seq_len']}_"
-        f"weight_decay_{config['weight_decay']}_"
+        f"wd_{config['weight_decay']}_"
         f"g2_{config['dana_g2']}_delta_{config['dana_delta']}_g3iv_{config['dana_g3_iv']}_"
         f"g3sv_{config['dana_g3_sv']}_g3p_{config['dana_g3_p']}_g3ts_{config['dana_g3_ts']}.pkl"
     )
