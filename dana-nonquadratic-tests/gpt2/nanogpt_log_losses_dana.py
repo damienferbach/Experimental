@@ -56,20 +56,10 @@ class FineWebDataset:
         self.parquet_files = parquet_files
         self.max_tokens = max_tokens
         self.is_validation = is_validation
-        #MILA CLUSTER
-        #self.enc = tiktoken.get_encoding("gpt2")
         #TAMIA CLUSTER
-        enc = tiktoken.Encoding(
-            name="gpt2",
-            pat_str=r"'s|'t|'re|'ve|'m|'ll|'d| ?\p{L}+| ?\p{N}+| ?[^\s\p{L}\p{N}]+|\s+(?!\S)|\s+",
-            mergeable_ranks=tiktoken.load_tiktoken_bpe(
-                "~/.cache/tiktoken/gpt2/vocab.bpe", 
-                "~/.cache/tiktoken/gpt2/encoder.json"
-            ),
-            special_tokens={
-                "": 50256,
-            }
-        )
+        tiktoken_cache_dir = "/tokenizer"
+        os.environ["TIKTOKEN_CACHE_DIR"] = tiktoken_cache_dir
+        self.enc = tiktoken.get_encoding("gpt2")
         self.eot = self.enc._special_tokens['<|endoftext|>']
         
         logger.info(f"FineWebDataset initialized with {len(parquet_files)} parquet files")
