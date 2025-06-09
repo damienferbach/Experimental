@@ -2,7 +2,11 @@ from huggingface_hub import snapshot_download
 import shutil
 import os
 
-local_dir = "../../../../scratch/fineweb/"
+#TAMIA CLUSTER
+local_dir = "/scratch/d/dferbach/fineweb/"
+#MILA CLUSTER
+#local_dir = "../../../../scratch/fineweb/"
+
 # Remove directory if it exists
 if os.path.exists(local_dir):
     shutil.rmtree(local_dir)
