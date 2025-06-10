@@ -15,6 +15,7 @@ with open(cfg_file) as f:
 DATA_ROOT     = pathlib.Path(cfg["data_root"])
 CHECKPOINT_DIR = pathlib.Path(cfg["checkpoint_dir"])
 if cfg["tokenizer_dir"] is not None:
+    print("Using "+cfg["tokenizer_dir"])
     TOKENIZER_DIR = pathlib.Path(cfg["tokenizer_dir"])
     os.environ["TIKTOKEN_CACHE_DIR"] = os.path.join(TOKENIZER_DIR)
 WANDB = cfg.get("wandb", False)

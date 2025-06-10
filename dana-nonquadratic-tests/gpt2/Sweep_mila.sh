@@ -6,6 +6,7 @@
 #SBATCH --gres=gpu:80GB
 #SBATCH --partition=unkillable
 
+export CLUSTER=mila
 module load anaconda/3
 conda activate dana-env
 
