@@ -1,0 +1,4 @@
+data_root:    "~/scratch/fineweb/sample/10BT"
+tokenizer_dir: "~/tokenizers"
+checkpoint_dir: "~/scratch/checkpoints"
+wandb: False

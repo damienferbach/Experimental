@@ -4,11 +4,22 @@ Modified version of nanogpt_log_losses_adana.py to use fineweb dataset
 with validation evaluation and plotting.
 """
 
-import os
+import os, yaml, socket, pathlib
 
-#TAMIA CLUSTER
-tiktoken_cache_dir = "/tokenizer"
-os.environ["TIKTOKEN_CACHE_DIR"] = tiktoken_cache_dir
+cluster = os.getenv("CLUSTER") or socket.gethostname().split('.')[0]
+cfg_file = pathlib.Path(__file__).parent / "configs" / f"{cluster}.yaml"
+with open(cfg_file) as f:
+    print(f"Loading config from {cfg_file}")
+    cfg = yaml.safe_load(f)
+
+DATA_ROOT     = pathlib.Path(cfg["data_root"])
+CHECKPOINT_DIR = pathlib.Path(cfg["checkpoint_dir"])
+if cfg["tokenizer_dir"] is not None:
+    TOKENIZER_DIR = pathlib.Path(cfg["tokenizer_dir"])
+    os.environ["TIKTOKEN_CACHE_DIR"] = os.path.join(TOKENIZER_DIR)
+WANDB = cfg.get("wandb", False)
+if WANDB:
+    import wandb
 
 import signal
 import time
@@ -27,8 +38,6 @@ from tqdm import tqdm
 from dataclasses import dataclass
 from huggingface_hub import snapshot_download
 import shutil
-#MILA CLUSTER
-#import wandb
 
 # Try to import directly
 from nanogpt_minimal import ModelConfig, TextDataset, init_train_state, train_step, count_params, GPT
@@ -433,11 +442,8 @@ def modify_nanogpt_for_fineweb():
         tx=optimizer)
     
     # Get parquet files and split for train/val
-    #TAMIA CLUSTER
-    data_root = "/scratch/d/dferbach/fineweb/sample/10BT"
-    #MILA CLUSTER
-    #data_root = os.path.expanduser("~/scratch/fineweb/sample/10BT")
-    #data_root = os.path.expanduser("~/fineweb-edu/sample/10BT")
+    #TAMIA/MILA CLUSTER
+    data_root = os.path.expanduser(DATA_ROOT)
 
     parquet_files = sorted(glob.glob(os.path.join(data_root, "*_00000.parquet")))
     
@@ -476,18 +482,18 @@ def modify_nanogpt_for_fineweb():
     start_time = time.time()
 
     run_name = f"gpt2_dana_fineweb_steps_{config['train_steps']}_bs_{config['batch_size']}_seq_{config['seq_len']}_g2_{config['dana_g2']}_g3iv_{config['dana_g3_iv']}_g3p_{config['dana_g3_p']}_wd_{config['weight_decay']}"
-    #MILA CLUSTER Initialize wandb
-    # wandb.init(project="gpt2-fineweb", 
-    #            name = run_name, 
-    #            config={
-    #     "model": "gpt2",
-    #     "dataset": "fineweb-10BT",
-    #     "batch_size": config["batch_size"],
-    #     "seq_len": config["seq_len"],
-    #     "dana_g2": config["dana_g2"],
-    #     "dana_g3_iv": config["dana_g3_iv"],
-    #     "dana_g3_p": config["dana_g3_p"]
-    # })
+    if WANDB:
+        wandb.init(project="gpt2-fineweb", 
+                    name = run_name, 
+                    config={
+            "model": "gpt2",
+            "dataset": "fineweb-10BT",
+            "batch_size": config["batch_size"],
+            "seq_len": config["seq_len"],
+            "dana_g2": config["dana_g2"],
+            "dana_g3_iv": config["dana_g3_iv"],
+            "dana_g3_p": config["dana_g3_p"]
+        })
     
     for step in pbar:
         # Get next batch
@@ -499,11 +505,11 @@ def modify_nanogpt_for_fineweb():
         # Update progress bar
         pbar.set_postfix(loss=f"{loss:.4f}")
         
-        #MILA CLUSTER Log loss to wandb at every step
-        # wandb.log({
-        #     "step": step,
-        #     "train_loss": float(loss)
-        # })
+        if WANDB:
+            wandb.log({
+                "step": step,
+                "train_loss": float(loss)
+            })
         
         # Log metrics at specified steps
         if step in LOG_STEPS:
@@ -517,13 +523,13 @@ def modify_nanogpt_for_fineweb():
             metrics_history['tokens_processed'].append(total_tokens)
             metrics_history['time_elapsed'].append(time.time() - start_time)
             
-            #MILA CLUSTER Log additional metrics to wandb
-            # wandb.log({
-            #     "val_loss": float(val_loss),
-            #     "tokens_processed": total_tokens,
-            #     "time_elapsed": time.time() - start_time,
-            #     "tokens_per_second": total_tokens / (time.time() - start_time) if (time.time() - start_time) > 0 else 0
-            # })
+            if WANDB:
+                wandb.log({
+                    "val_loss": float(val_loss),
+                    "tokens_processed": total_tokens,
+                    "time_elapsed": time.time() - start_time,
+                    "tokens_per_second": total_tokens / (time.time() - start_time) if (time.time() - start_time) > 0 else 0
+                })
             
             # Print detailed metrics
             elapsed = time.time() - start_time
@@ -535,14 +541,12 @@ def modify_nanogpt_for_fineweb():
             tqdm.write(f"  Tokens: {total_tokens:,} ({average_tokens_per_second:.1f} tokens/s)")
             tqdm.write(f"  G2: {config['dana_g2']}, G3_iv: {config['dana_g3_iv']}, g3p: {config['dana_g3_p']}\n")
     
-    #MILA CLUSTER Close wandb run
-    # wandb.finish()
+    if WANDB:
+        wandb.finish()
     
     # Create CHECKPOINTS directory in scratch
-    #TAMIA CLUSTER
-    checkpoint_dir = "/scratch/d/dferbach/checkpoints"
-    #MILA CLUSTER
-    #checkpoint_dir = os.path.expanduser("~/scratch/checkpoints")
+    #TAMIA/MILA CLUSTER
+    checkpoint_dir = os.path.expanduser(CHECKPOINT_DIR)
     os.makedirs(checkpoint_dir, exist_ok=True)
     
     # Save model parameters
