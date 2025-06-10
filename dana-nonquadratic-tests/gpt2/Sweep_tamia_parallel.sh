@@ -6,8 +6,6 @@
 #SBATCH --cpus-per-gpu=8
 #SBATCH --mem=0                    # “alloc as needed” on Alliance
 #SBATCH --job-name=hpo-array
-#SBATCH --output=logs/%x-%j_%t.out # %j job‑ID, %t task‑ID
-#SBATCH --error=logs/%x-%j_%t.err # %j job‑ID, %t task‑ID
 
 export CLUSTER=tamia
 module load arrow/18.1.0 
@@ -20,7 +18,7 @@ echo "activated env"
 
 # Launch four copies in parallel; each sees one GPU
 srun --ntasks=4 --cpus-per-task=$SLURM_CPUS_PER_GPU \
-     --gpus-per-task=h100:1 --gpu-bind=single:1 --exclusive \
+     --gpus-per-task=h100:1 --gpu-bind=single:1 --output=logs/%x-%j_%t.out --error=logs/%x-%j_%t.err --exclusive \
      bash -c '
         i=$SLURM_LOCALID                 # 0..3
         case $i in
