@@ -8,7 +8,7 @@
 #SBATCH --account=aip-gidelgau
 
 #TAMIA CLUSTER
-module load arrow/11.0.8
+module load arrow/18.1.0 
 module load python/3.10.13
 source ../../dana-env/bin/activate
 
