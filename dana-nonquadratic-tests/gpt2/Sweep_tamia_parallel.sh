@@ -20,7 +20,7 @@ echo "activated env"
 
 # Launch four copies in parallel; each sees one GPU
 srun --ntasks=4 --cpus-per-task=$SLURM_CPUS_PER_GPU \
-     --gpus-per-task=1 --gpu-bind=single:1 --exclusive \
+     --gpus-per-task=h100:1 --gpu-bind=single:1 --exclusive \
      bash -c '
         i=$SLURM_LOCALID                 # 0..3
         case $i in
