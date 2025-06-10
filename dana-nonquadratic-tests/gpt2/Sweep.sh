@@ -1,10 +1,11 @@
 #! /bin/bash
 #SBATCH --output=gpt2_sweep_.out
 #SBATCH --error=gpt2_sweep.err
-#SBATCH --time=48:00:00
-#SBATCH --mem=32G
-#SBATCH --gres=gpu:80GB
-#SBATCH --partition=unkillable
+#SBATCH --open-mode=truncate
+#SBATCH --time=3:00:00
+#SBATCH --mem=128GB
+#SBATCH --gpus-per-node=h100:4
+#SBATCH --account=aip-gidelgau
 
 #TAMIA CLUSTER
 module load arrow/11.0.8
