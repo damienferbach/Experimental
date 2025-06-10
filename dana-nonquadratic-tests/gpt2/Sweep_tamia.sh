@@ -11,6 +11,7 @@ export CLUSTER=tamia
 module load arrow/18.1.0 
 module load python/3.10.13
 module load cuda/12.6
+module load httpproxy
 echo "loaded modules"
 source ~/links/projects/aip-gidelgau/dferbach/my-envs/dana-env/bin/activate
 echo "activated env"
