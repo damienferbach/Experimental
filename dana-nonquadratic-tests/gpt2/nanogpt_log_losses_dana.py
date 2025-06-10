@@ -5,6 +5,11 @@ with validation evaluation and plotting.
 """
 
 import os
+
+#TAMIA CLUSTER
+tiktoken_cache_dir = "/tokenizer"
+os.environ["TIKTOKEN_CACHE_DIR"] = tiktoken_cache_dir
+
 import signal
 import time
 import numpy as np
@@ -56,9 +61,6 @@ class FineWebDataset:
         self.parquet_files = parquet_files
         self.max_tokens = max_tokens
         self.is_validation = is_validation
-        #TAMIA CLUSTER
-        tiktoken_cache_dir = "/tokenizer"
-        os.environ["TIKTOKEN_CACHE_DIR"] = tiktoken_cache_dir
         self.enc = tiktoken.get_encoding("gpt2")
         self.eot = self.enc._special_tokens['<|endoftext|>']
         
