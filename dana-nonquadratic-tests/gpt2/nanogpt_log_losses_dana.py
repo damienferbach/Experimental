@@ -21,6 +21,9 @@ if cfg["tokenizer_dir"] is not None:
 WANDB = cfg.get("wandb", False)
 if WANDB:
     import wandb
+import tiktoken
+test=tiktoken.get_encoding("gpt2")
+print("passed")
 
 import signal
 import time
@@ -31,7 +34,6 @@ import matplotlib.ticker as ticker
 import scipy.stats as stats
 import argparse
 import logging
-import tiktoken
 import glob
 import pandas as pd
 from typing import Dict, List, Any
