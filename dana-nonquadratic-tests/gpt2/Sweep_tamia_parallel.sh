@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --account=aip-gidelgau
-#SBATCH --time=3:00:00
+#SBATCH --time=24:00:00
 #SBATCH --nodes=1
 #SBATCH --gpus-per-node=h100:4
 #SBATCH --cpus-per-gpu=8
@@ -8,6 +8,7 @@
 #SBATCH --job-name=hpo-array
 
 export CLUSTER=tamia
+export WANDB_API_KEY=bece9f2099e3e85e0ae9922002616cf20bd26946
 module load arrow/18.1.0 
 module load python/3.10.13
 module load cuda/12.6
@@ -22,10 +23,10 @@ srun --ntasks=4 --cpus-per-task=$SLURM_CPUS_PER_GPU \
      bash -c '
         i=$SLURM_LOCALID                 # 0..3
         case $i in
-          0) p=0.0 ;;
-          1) p=0.1 ;;
-          2) p=0.2 ;;
-          3) p=0.3 ;;
+          0) wd=1.0 ;;
+          1) wd=0.1 ;;
+          2) wd=0.01 ;;
+          3) wd=0.001 ;;
         esac
-        python nanogpt_log_losses_dana.py --train_steps=100 --batch_size=32 --val_batch_size=32 --seq_len=32 --dana_g2=0.05 --dana_g3_iv=0.01 --dana_g3_p=-${p} --weight_decay=0.01
+        python nanogpt_log_losses_dana.py --train_steps=100000 --batch_size=32 --val_batch_size=32 --seq_len=1024 --dana_g2=0.05 --dana_g3_iv=0.01 --dana_g3_p=-5.0 --weight_decay=${wd}
      '
