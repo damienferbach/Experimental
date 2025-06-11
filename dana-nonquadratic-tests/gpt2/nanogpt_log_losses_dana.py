@@ -488,15 +488,8 @@ def modify_nanogpt_for_fineweb():
     if WANDB:
         wandb.init(project="gpt2-fineweb", 
                     name = run_name, 
-                    config={
-            "model": "gpt2",
-            "dataset": "fineweb-10BT",
-            "batch_size": config["batch_size"],
-            "seq_len": config["seq_len"],
-            "dana_g2": config["dana_g2"],
-            "dana_g3_iv": config["dana_g3_iv"],
-            "dana_g3_p": config["dana_g3_p"]
-        })
+                    config=config)
+        config = wandb.config
     
     for step in pbar:
         # Get next batch
