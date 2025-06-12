@@ -18,10 +18,8 @@ parameters:
   seq_len:
     value: 1024
   dana_g2:
-    value: [4.0, 1.0, 0.25, 0.0625]
-  dana_g3_iv:
-    value: [.2]
+    values: [4.0, 1.0, 0.25, 0.0625]
   dana_g3_p:
-    values: [.6]
+    value: .6
   weight_decay:
-    values: [0.0, 0.0001, 0.001, 0.01]
+    value: 0.0
