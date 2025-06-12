@@ -34,16 +34,17 @@ echo "activated env"
 
 # WANDB SWEEP
 # Launch sweep and capture the Sweep ID
-SWEEP_ID=$(wandb sweep sweep_config.yaml | grep "Created sweep with ID:" | awk '{print $NF}')
+SWEEP_ID=$(wandb sweep sweep_config.yaml 2>&1| grep -o 'wandb agent .*' | awk  '{print $NF}')
 echo "Created sweep with ID: $SWEEP_ID"
 
 # Check if sweep creation succeeded
 if [ -z "$SWEEP_ID" ]; then
+    echo $SWEEP_ID
     echo "Failed to create sweep or extract Sweep ID!"
     exit 1
 fi
 
 # Start 4 parallel agents (1 per GPU)
 srun --ntasks=4 --cpus-per-task=$SLURM_CPUS_PER_GPU \
-     --gpus-per-task=1 --gpu-bind=single:1 --exclusive \
+     --gpus-per-task=h100:1 --gpu-bind=single:1 --exclusive \
      bash -c "export CUDA_VISIBLE_DEVICES=\$SLURM_LOCALID && wandb agent $SWEEP_ID"
