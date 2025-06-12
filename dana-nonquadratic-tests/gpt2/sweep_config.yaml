@@ -1,0 +1,24 @@
+program: nanogpt_log_losses_dana.py
+
+method: grid  # or random, bayes
+metric:
+  name: val_loss
+  goal: minimize
+
+parameters:
+  train_steps:
+    value: 100000
+  batch_size:
+    value: 32
+  val_batch_size:
+    value: 32
+  seq_len:
+    value: 1024
+  dana_g2:
+    value: [2**2, 2**0, 2**(-2), 2**(-4)]
+  dana_g3_iv:
+    value: [.2]
+  dana_g3_p:
+    values: [.6]
+  weight_decay:
+    values: [0.0, 0.0001, 0.001, 0.01]

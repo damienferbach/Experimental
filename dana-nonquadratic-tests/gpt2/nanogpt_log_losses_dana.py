@@ -268,7 +268,7 @@ def parse_args():
     )
     parser.add_argument(
         "--dana_g3_iv", type=float, default=0.2,
-        help="DANA G3 initial value"
+        help="(dana_g3_iv) * (dana_g2) represents DANA G3 initial value to keep the ratio of g3 to g2 constant"
     )
     parser.add_argument(
         "--dana_g3_sv", type=float, default=0.0,
@@ -421,7 +421,7 @@ def modify_nanogpt_for_fineweb():
     # Initialize DANA optimizer
     g1 = optimizers.powerlaw_schedule(1.0, 0.0, 0.0, 1)
     g2 = optimizers.powerlaw_schedule(config["dana_g2"], 0.0, 0.0, 1)
-    g3 = optimizers.powerlaw_schedule(config["dana_g3_iv"], 0.0, config["dana_g3_p"], 1)
+    g3 = optimizers.powerlaw_schedule(config["dana_g3_iv"] * config["dana_g2"], 0.0, config["dana_g3_p"], 1)
     Delta = optimizers.powerlaw_schedule(1.0, 0.0, -1.0, config["dana_delta"])
     dana = optimizers.dana_optimizer(g1=g1, g2=g2, g3=g3, Delta=Delta)
     

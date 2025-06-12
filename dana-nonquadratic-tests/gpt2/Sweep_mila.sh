@@ -13,5 +13,5 @@ conda activate dana-env
 for p in 5.0
 do
     echo "Running with g3p = $p"
-    python nanogpt_log_losses_dana.py --train_steps=10000 --batch_size=32 --val_batch_size=32 --seq_len=1024 --dana_g2=0.05 --dana_g3_iv=0.01 --dana_g3_p=-$p --weight_decay=0.0 #--wandb="yes" --path=""
+    python nanogpt_log_losses_dana.py --train_steps=100000 --batch_size=32 --val_batch_size=32 --seq_len=1024 --dana_g2=0.05 --dana_g3_iv=0.01 --dana_g3_p=-$p --weight_decay=0.0 #--wandb="yes" --path=""
 done
