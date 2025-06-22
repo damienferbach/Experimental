@@ -475,21 +475,24 @@ def modify_nanogpt_for_fineweb():
     if args.optimizer == "dana":
         optimizer = optax.chain(
             optax.clip_by_global_norm(config['grad_clip']),
+            dana,
             optax.add_decayed_weights(config['weight_decay'] * config['dana_g2']),
-            dana
+            optax.scale_by_learning_rate(config['learning_rate'])
         )
     elif args.optimizer == "rmsprop":
         optimizer = optax.chain(
             optax.clip_by_global_norm(config['grad_clip']),
+            optax.scale_by_rms(decay=config['beta_2']),
             optax.add_decayed_weights(config['weight_decay']),
-            optax.rmsprop(learning_rate=config['learning_rate'], decay=config['beta_2'])
+            optax.scale_by_learning_rate(config['learning_rate'])
         )
     else:  # rmsprop_dana
         optimizer = optax.chain(
             optax.clip_by_global_norm(config['grad_clip']),
-            optax.add_decayed_weights(config['weight_decay']),
-            optax.rmsprop(learning_rate=config['learning_rate'], decay=config['beta_2']),
-            dana
+            optax.scale_by_rms(decay=config['beta_2']),
+            dana,
+            optax.add_decayed_weights(config['weight_decay'] * config['dana_g2']),
+            optax.scale_by_learning_rate(-1.0 * config['learning_rate'])
         )
     
     # Initialize model
