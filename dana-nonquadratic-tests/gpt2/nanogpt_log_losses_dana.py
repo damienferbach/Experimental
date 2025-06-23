@@ -491,8 +491,8 @@ def modify_nanogpt_for_fineweb():
             optax.clip_by_global_norm(config['grad_clip']),
             optax.scale_by_rms(decay=config['beta_2']),
             dana,
-            optax.add_decayed_weights(config['weight_decay'] * config['dana_g2']),
-            optax.scale_by_learning_rate(-1.0 * config['learning_rate'])
+            optax.add_decayed_weights(-1.0 * config['weight_decay'] * config['dana_g2']),
+            optax.scale_by_learning_rate(config['learning_rate'], flip_sign=False)
         )
     elif args.optimizer == "adam":
         optimizer = optax.chain(
