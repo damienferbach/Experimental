@@ -303,7 +303,10 @@ def parse_args():
         "--checkpoint_dir", type=str, default="~/scratch/checkpoints",
         help="Checkpoint directory"
     )
-
+    parser.add_argument(
+        "--bias_correction", type=bool, default=False,
+        help="Whether to add bias correction in rms prop update"
+    )
     # Parse command line args first
     args = parser.parse_args()
     
@@ -451,7 +454,8 @@ def modify_nanogpt_for_fineweb():
         "beta_2": args.beta_2,
         "wandb": args.wandb,
         "data_root": args.data_root,
-        "checkpoint_dir": args.checkpoint_dir
+        "checkpoint_dir": args.checkpoint_dir,
+        "bias_correction": args.bias_correction
     }
 
     DATA_ROOT     = pathlib.Path(config["data_root"])
@@ -482,14 +486,14 @@ def modify_nanogpt_for_fineweb():
     elif args.optimizer == "rmsprop":
         optimizer = optax.chain(
             optax.clip_by_global_norm(config['grad_clip']),
-            optax.scale_by_rms(decay=config['beta_2']),
+            optax.scale_by_rms(decay=config['beta_2'], bias_correction=config['bias_correction']), # bias_correction=True to match Adam with beta_1 = 0.0
             optax.add_decayed_weights(config['weight_decay']),
             optax.scale_by_learning_rate(config['learning_rate'])
         )
     elif args.optimizer == "rmsprop_dana":
         optimizer = optax.chain(
             optax.clip_by_global_norm(config['grad_clip']),
-            optax.scale_by_rms(decay=config['beta_2']),
+            optax.scale_by_rms(decay=config['beta_2'], bias_correction=config['bias_correction']),
             dana,
             optax.add_decayed_weights(-1.0 * config['weight_decay'] * config['dana_g2']),
             optax.scale_by_learning_rate(config['learning_rate'], flip_sign=False)
