@@ -280,8 +280,8 @@ def parse_args():
     )
     parser.add_argument(
         "--optimizer", type=str, default="dana",
-        choices=["dana", "rmsprop", "rmsprop_dana"],
-        help="Optimizer to use: dana, rmsprop, or rmsprop_dana"
+        choices=["dana", "rmsprop", "rmsprop_dana", "adam"],
+        help="Optimizer to use: dana, rmsprop, rmsprop_dana or adam"
     )
     parser.add_argument(
         "--learning_rate", type=float, default=1.0,
@@ -486,13 +486,20 @@ def modify_nanogpt_for_fineweb():
             optax.add_decayed_weights(config['weight_decay']),
             optax.scale_by_learning_rate(config['learning_rate'])
         )
-    else:  # rmsprop_dana
+    elif args.optimizer == "rmsprop_dana":
         optimizer = optax.chain(
             optax.clip_by_global_norm(config['grad_clip']),
             optax.scale_by_rms(decay=config['beta_2']),
             dana,
             optax.add_decayed_weights(config['weight_decay'] * config['dana_g2']),
             optax.scale_by_learning_rate(-1.0 * config['learning_rate'])
+        )
+    elif args.optimizer == "adam":
+        optimizer = optax.chain(
+            optax.clip_by_global_norm(config['grad_clip']),
+            optax.scale_by_adam(),
+            optax.add_decayed_weights(config['weight_decay']),
+            optax.scale_by_learning_rate(config['learning_rate'])
         )
     
     # Initialize model
