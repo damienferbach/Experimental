@@ -307,6 +307,10 @@ def parse_args():
         "--bias_correction", type=bool, default=False,
         help="Whether to add bias correction in rms prop update"
     )
+    parser.add_argument(
+        "--warmup", type=int, default=0,
+        help="Warmup steps for learning rate (linear increase from 0 to learning_rate)"
+    )
     # Parse command line args first
     args = parser.parse_args()
     
@@ -455,7 +459,8 @@ def modify_nanogpt_for_fineweb():
         "wandb": args.wandb,
         "data_root": args.data_root,
         "checkpoint_dir": args.checkpoint_dir,
-        "bias_correction": args.bias_correction
+        "bias_correction": args.bias_correction,
+        "warmup": args.warmup
     }
 
     DATA_ROOT     = pathlib.Path(config["data_root"])
@@ -477,33 +482,37 @@ def modify_nanogpt_for_fineweb():
     
     # Create optimizer chain based on selected optimizer
     if args.optimizer == "dana":
+        sched = optax.schedules.warmup_constant_schedule(init_value=0, peak_value=config['learning_rate'], warmup_steps=config['warmup'])
         optimizer = optax.chain(
             optax.clip_by_global_norm(config['grad_clip']),
             dana,
             optax.add_decayed_weights(config['weight_decay'] * config['dana_g2']),
-            optax.scale_by_learning_rate(config['learning_rate'])
+            optax.scale_by_learning_rate(sched)
         )
     elif args.optimizer == "rmsprop":
+        sched = optax.schedules.warmup_constant_schedule(init_value=0, peak_value=config['learning_rate'], warmup_steps=config['warmup'])
         optimizer = optax.chain(
             optax.clip_by_global_norm(config['grad_clip']),
             optax.scale_by_rms(decay=config['beta_2'], bias_correction=config['bias_correction']), # bias_correction=True to match Adam with beta_1 = 0.0
             optax.add_decayed_weights(config['weight_decay']),
-            optax.scale_by_learning_rate(config['learning_rate'])
+            optax.scale_by_learning_rate(sched)
         )
     elif args.optimizer == "rmsprop_dana":
+        sched = optax.schedules.warmup_constant_schedule(init_value=0, peak_value=config['learning_rate'], warmup_steps=config['warmup'])
         optimizer = optax.chain(
             optax.clip_by_global_norm(config['grad_clip']),
             optax.scale_by_rms(decay=config['beta_2'], bias_correction=config['bias_correction']),
             dana,
             optax.add_decayed_weights(-1.0 * config['weight_decay'] * config['dana_g2']),
-            optax.scale_by_learning_rate(config['learning_rate'], flip_sign=False)
+            optax.scale_by_learning_rate(sched, flip_sign=False)
         )
     elif args.optimizer == "adam":
+        sched = optax.schedules.warmup_constant_schedule(init_value=0, peak_value=config['learning_rate'], warmup_steps=config['warmup'])
         optimizer = optax.chain(
             optax.clip_by_global_norm(config['grad_clip']),
             optax.scale_by_adam(),
             optax.add_decayed_weights(config['weight_decay']),
-            optax.scale_by_learning_rate(config['learning_rate'])
+            optax.scale_by_learning_rate(sched)
         )
     
     # Initialize model
