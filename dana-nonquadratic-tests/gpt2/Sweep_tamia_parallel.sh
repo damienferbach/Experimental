@@ -5,7 +5,7 @@
 #SBATCH --gpus-per-node=h100:4
 #SBATCH --cpus-per-gpu=8
 #SBATCH --mem=0                    # “alloc as needed” on Alliance
-#SBATCH --job-name=sweep_g2
+#SBATCH --job-name=rope_sweep_kappa
 
 export CLUSTER=tamia
 export WANDB_API_KEY=bece9f2099e3e85e0ae9922002616cf20bd26946
@@ -24,13 +24,13 @@ srun --ntasks=4 --cpus-per-task=$SLURM_CPUS_PER_GPU \
      bash -c '
         i=$SLURM_LOCALID                 # 0..3
         case $i in
-          0) dana_g3_p=0.4 ;;
-          1) dana_g3_p=0.0 ;;
-          2) dana_g3_p=1.0 ;;
-          3) dana_g3_p=5.0 ;;
+          0) dana_kappa=0.0 ;;
+          1) dana_kappa=0.2 ;;
+          2) dana_kappa=0.4 ;;
+          3) dana_kappa=0.6 ;;
         esac
-        python nanogpt_log_losses_dana.py --train_steps=100000 --batch_size=32 --val_batch_size=32 --seq_len=1024 --dana_g2=0.25 --dana_g3_iv=0.2 --dana_g3_p=-${dana_g3_p} --weight_decay=0.1 --wandb=True --optimizer="adam" --learning_rate=0.0001 --beta_2=0.95 --bias_correction=True
-	'
+        python ../../timescale-experiment/nanogpt_rmsprop_dana_baseline_mixed_bf16_rope.py --train_steps=100000 --batch_size=32 --val_batch_size=32 --seq_len=1024 --dana_g2=0.05 --dana_g3=0.01 --dana_kappa=${dana_kappa} --wandb=True  
+  '
 
 # WANDB SWEEP
 # Launch sweep and capture the Sweep ID
