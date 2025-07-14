@@ -29,7 +29,7 @@ srun --ntasks=4 --cpus-per-task=$SLURM_CPUS_PER_GPU \
           2) dana_kappa=0.4 ;;
           3) dana_kappa=0.6 ;;
         esac
-        python ../../timescale-experiment/nanogpt_rmsprop_dana_baseline_mixed_bf16_rope.py --train_steps=100000 --batch_size=32 --val_batch_size=32 --seq_len=1024 --dana_g2=0.05 --dana_g3=0.01 --dana_kappa=${dana_kappa} --wandb=True  
+        python ../../timescale-experiment/nanogpt_rmsprop_dana_baseline_mixed_bf16_rope.py --train_steps=100000 --batch_size=32 --val_batch_size=32 --seq_len=1024 --dana_g2=0.05 --dana_g3=0.01 --dana_kappa=${dana_kappa} --wandb=True --data_root="~/links/scratch/fineweb/sample/10BT"
   '
 
 # WANDB SWEEP
