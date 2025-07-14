@@ -1,0 +1,25 @@
+program: nanogpt_log_losses_dana.py
+
+entity: team_damien_frb
+project: gpt2-fineweb
+
+method: grid  # or random, bayes
+metric:
+  name: val_loss
+  goal: minimize
+
+parameters:
+  train_steps:
+    value: 100000
+  batch_size:
+    value: 32
+  val_batch_size:
+    value: 32
+  seq_len:
+    value: 1024
+  dana_g2:
+    values: [4.0, 1.0, 0.25, 0.0625]
+  dana_g3_p:
+    value: .6
+  weight_decay:
+    value: 0.0

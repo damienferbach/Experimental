@@ -1,0 +1,4 @@
+data_root:    "~/links/scratch/fineweb/sample/10BT"
+tokenizer_dir: "~/links/projects/aip-gidelgau/dferbach/Experimental/dana-nonquadratic-tests/gpt2/tokenizer/gpt2/crafted"
+checkpoint_dir: "~/links/scratch/checkpoints"
+wandb: True
