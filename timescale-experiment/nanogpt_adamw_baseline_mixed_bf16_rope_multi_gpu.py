@@ -16,12 +16,23 @@ import scipy.stats as stats
 import argparse
 import logging
 import functools
+import pathlib
 from typing import Dict, List, Any
 from tqdm import tqdm
 
 # Import from the gpt2 directory
 import sys
-sys.path.append('../dana-nonquadratic-tests/gpt2')
+import os
+
+# Get the directory where this script is located
+script_dir = os.path.dirname(os.path.abspath(__file__))
+# Add the gpt2 directory to the path
+gpt2_dir = os.path.join(script_dir, '..', 'dana-nonquadratic-tests', 'gpt2')
+sys.path.append(gpt2_dir)
+print(f"Added to sys.path: {gpt2_dir}")
+print(f"Current working directory: {os.getcwd()}")
+print(f"Script directory: {script_dir}")
+
 from nanogpt_minimal import count_params
 from nanogpt_rope_mixed_precision import GPTWithRoPE, ModelConfig
 from fineweb_dataset import FineWebDataset, create_fineweb_datasets
@@ -37,8 +48,9 @@ import optax
 from flax.core import FrozenDict
 from flax.training.train_state import TrainState
 from flax import linen as nn
+import wandb
 
-LOG_STEPS_BASE = 1.01
+LOG_STEPS_BASE = 1.1
 INIT_STD = 0.02
 
 # Set up logging
@@ -200,6 +212,11 @@ def parse_args():
         "--decay_fraction", type=float, default=0.0,
         help="Final decay fraction for WSD schedule (default: 0.0)"
     )
+    # Wandb parameters
+    parser.add_argument(
+        "--wandb", type=bool, default=False,
+        help="Whether to use wandb"
+    )
     # Checkpoint parameters
     parser.add_argument(
         "--disable_checkpoint", action="store_true",
@@ -296,6 +313,7 @@ def main():
         "enable_wsd": args.enable_wsd,
         "warmup_fraction": args.warmup_fraction,
         "decay_fraction": args.decay_fraction,
+        "wandb": args.wandb,
         "precision": "mixed_bfloat16_rope",
         "num_devices": jax.device_count()
     }
@@ -328,7 +346,8 @@ def main():
     logger.info(f"Gradient clipping: {config['grad_clip']}")
     
     # Initialize datasets using the new utility function
-    data_root = os.path.expanduser("../dana-nonquadratic-tests/gpt2/fineweb-edu/sample/10BT")
+    DATA_ROOT = pathlib.Path("../dana-nonquadratic-tests/gpt2/fineweb-edu/sample/10BT")
+    data_root = os.path.expanduser(DATA_ROOT)
     if config["disable_validation"]:
         # Only create training dataset - use create_fineweb_datasets but ignore validation
         train_dataset, _ = create_fineweb_datasets(
@@ -360,6 +379,13 @@ def main():
     pbar = tqdm(range(config["train_steps"]), desc="Training")
     start_time = time.time()
     
+    run_name = f"gpt2_adamw_fineweb_rope_mixed_precision_multi_gpu"
+    if config.get("wandb", False):
+        wandb.init(project="gpt2-rope-mixed-precision", 
+                    name = run_name, 
+                    config=config)
+        config = wandb.config
+    
     for step in pbar:
         # Get next batch
         x, y, w = next(train_iterator)
@@ -369,6 +395,12 @@ def main():
         
         # Update progress bar
         pbar.set_postfix(loss=f"{loss:.4f}")
+
+        if config.get("wandb", False):
+            wandb.log({
+                "step": step,
+                "train_loss": float(loss)
+            })
         
         # Log metrics at specified steps
         if step in LOG_STEPS:
@@ -384,6 +416,14 @@ def main():
             metrics_history['val_loss'].append(float(val_loss))
             metrics_history['tokens_processed'].append(total_tokens)
             metrics_history['time_elapsed'].append(time.time() - start_time)
+            
+            if config.get("wandb", False):
+                wandb.log({
+                    "val_loss": float(val_loss),
+                    "tokens_processed": total_tokens,
+                    "time_elapsed": time.time() - start_time,
+                    "tokens_per_second": total_tokens / (time.time() - start_time) if (time.time() - start_time) > 0 else 0
+                })
             
             # Print detailed metrics
             elapsed = time.time() - start_time
@@ -434,6 +474,9 @@ def main():
         pickle.dump(results_data, f)
     
     print(f"Results saved to {results_filename}")
+    
+    if config.get("wandb", False):
+        wandb.finish()
     
     # Save checkpoint of weights (if enabled)
     if not config["disable_checkpoint"]:
