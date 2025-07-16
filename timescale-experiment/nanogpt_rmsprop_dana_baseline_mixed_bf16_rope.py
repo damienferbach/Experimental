@@ -96,10 +96,10 @@ def parse_args():
         "--val_steps", type=int, default=20,
         help="Number of validation steps"
     )
-    # parser.add_argument(
-    #     "--grad_clip", type=float, default=2.0,
-    #     help="Gradient clipping value"
-    # )
+    parser.add_argument(
+        "--grad_clip", type=float, default=2.0,
+        help="Gradient clipping value"
+    )
     parser.add_argument(
         "--init_std", type=float, default=0.02,
         help="Weight initialization standard deviation"
@@ -206,7 +206,8 @@ def main():
         "dana_kappa": args.dana_kappa,
         "rope_base": args.rope_base,
         "precision": "mixed_bfloat16_rope",
-        "data_root": args.data_root
+        "data_root": args.data_root,
+        "grad_clip": args.grad_clip
     }
     
     # Create LOG_STEPS
@@ -227,6 +228,7 @@ def main():
     
     # Chain RMSProp and Dana optimizers
     optimizer = optax.chain(
+        optax.clip_by_global_norm(config['grad_clip']),
         # optax.scale_by_rms(
         #     decay=config['rms_decay'],
         #     eps=config['rms_eps']
