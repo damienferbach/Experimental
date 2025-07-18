@@ -315,7 +315,14 @@ def parse_args():
     args = parser.parse_args()
     
     # Then load YAML config and override defaults if not specified in command line
-    cluster = os.getenv("CLUSTER") or socket.gethostname().split('.')[0]
+    machines = os.getenv("CLUSTER") or socket.gethostname().split('.')
+    if 'mila' in machines:
+        cluster = 'mila'
+    elif 'tamia' in machines:
+        cluster = 'tamia'
+    else:
+        print('Unknown cluster')
+        raise ValueError('Unknown cluster')
     cfg_file = pathlib.Path(__file__).parent / "configs" / f"{cluster}.yaml"
     with open(cfg_file) as f:
         print(f"Loading config from {cfg_file}")
@@ -482,12 +489,12 @@ def modify_nanogpt_for_fineweb():
     
     # Create optimizer chain based on selected optimizer
     if args.optimizer == "dana":
-        sched = optax.schedules.warmup_constant_schedule(init_value=0, peak_value=config['learning_rate'], warmup_steps=config['warmup'])
+        #sched = optax.schedules.warmup_constant_schedule(init_value=0, peak_value=config['learning_rate'], warmup_steps=config['warmup'])
         optimizer = optax.chain(
             optax.clip_by_global_norm(config['grad_clip']),
             dana,
-            optax.add_decayed_weights(config['weight_decay'] * config['dana_g2']),
-            optax.scale_by_learning_rate(sched)
+            optax.add_decayed_weights(config['weight_decay'] * config['dana_g2'])
+            #optax.scale_by_learning_rate(sched)
         )
     elif args.optimizer == "rmsprop":
         sched = optax.schedules.warmup_constant_schedule(init_value=0, peak_value=config['learning_rate'], warmup_steps=config['warmup'])
