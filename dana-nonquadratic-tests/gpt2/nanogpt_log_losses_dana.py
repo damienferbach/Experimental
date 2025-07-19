@@ -62,6 +62,60 @@ class ModelConfig:
     n_layer: int = 12
     dropout_rate: float = 0.1
 
+# GPT-2 model size configurations
+GPT2_CONFIGS = {
+    'GPT2-nano': ModelConfig(
+        vocab_size=50304,
+        n_head=12,
+        n_embd=768,
+        block_size=1024,
+        n_layer=12,
+        dropout_rate=0.1
+    ),
+    'GPT2-medium': ModelConfig(
+        vocab_size=50304,
+        n_head=16,
+        n_embd=1024,
+        block_size=1024,
+        n_layer=24,
+        dropout_rate=0.1
+    ),
+    'GPT2-large': ModelConfig(
+        vocab_size=50304,
+        n_head=20,
+        n_embd=1280,
+        block_size=1024,
+        n_layer=36,
+        dropout_rate=0.1
+    ),
+    'GPT2-jumbo': ModelConfig(
+        vocab_size=50304,
+        n_head=25,
+        n_embd=1600,
+        block_size=1024,
+        n_layer=48,
+        dropout_rate=0.1
+    )
+}
+
+
+def get_model_config(model_name: str) -> ModelConfig:
+    """Get model configuration by name.
+    
+    Args:
+        model_name: Name of the model ('GPT2-nano', 'GPT2-medium', 'GPT2-large', 'GPT2-jumbo')
+        
+    Returns:
+        ModelConfig: Configuration for the specified model
+        
+    Raises:
+        ValueError: If model_name is not recognized
+    """
+    if model_name not in GPT2_CONFIGS:
+        available_models = ', '.join(GPT2_CONFIGS.keys())
+        raise ValueError(f"Unknown model '{model_name}'. Available models: {available_models}")
+    return GPT2_CONFIGS[model_name]
+
 class FineWebDataset:
     """Dataset class that reads parquet files one at a time and tokenizes on-the-fly, similar to TextDataset"""
     def __init__(self, parquet_files, max_tokens=None, is_validation=False):
@@ -311,6 +365,10 @@ def parse_args():
         "--warmup", type=int, default=0,
         help="Warmup steps for learning rate (linear increase from 0 to learning_rate)"
     )
+    parser.add_argument(
+        "--model", type=str, default="GPT2-nano",
+        help="Model to use: GPT2-nano, GPT2-medium, GPT2-large, GPT2-jumbo"
+    )
     # Parse command line args first
     args = parser.parse_args()
     
@@ -467,7 +525,8 @@ def modify_nanogpt_for_fineweb():
         "data_root": args.data_root,
         "checkpoint_dir": args.checkpoint_dir,
         "bias_correction": args.bias_correction,
-        "warmup": args.warmup
+        "warmup": args.warmup,
+        "model": args.model
     }
 
     DATA_ROOT     = pathlib.Path(config["data_root"])
@@ -524,9 +583,10 @@ def modify_nanogpt_for_fineweb():
     
     # Initialize model
     key = jax.random.PRNGKey(0)
-    model = GPT(ModelConfig())
+    model = GPT(get_model_config(config["model"]))
     params = model.init(key)
     num_params = count_params(params)
+    print(f"Training model: {config['model']}, Number of parameters: {num_params:,}")
     
     # Initialize train state
     state = TrainState.create(

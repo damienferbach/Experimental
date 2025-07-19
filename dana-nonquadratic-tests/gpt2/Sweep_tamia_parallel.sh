@@ -24,12 +24,12 @@ srun --ntasks=4 --cpus-per-task=$SLURM_CPUS_PER_GPU \
      bash -c '
         i=$SLURM_LOCALID                 # 0..3
         case $i in
-          0) dana_g3_p=0.4 ;;
-          1) dana_g3_p=0.0 ;;
-          2) dana_g3_p=1.0 ;;
-          3) dana_g3_p=5.0 ;;
+          0) dana_g3_p=0.0 ;;
+          1) dana_g3_p=0.3 ;;
+          2) dana_g3_p=0.6 ;;
+          3) dana_g3_p=0.9 ;;
         esac
-        python nanogpt_log_losses_dana.py --train_steps=100000 --batch_size=32 --val_batch_size=32 --seq_len=1024 --dana_g2=0.25 --dana_g3_iv=0.2 --dana_g3_p=-${dana_g3_p} --weight_decay=0.0 --wandb=True --optimizer="dana"
+        python nanogpt_log_losses_dana.py --train_steps=100000 --batch_size=32 --val_batch_size=32 --seq_len=1024 --dana_g2=0.25 --dana_g3_iv=0.2 --dana_g3_p=-${dana_g3_p} --weight_decay=0.0 --wandb=True --optimizer="dana" --model="GPT2-medium"
 	'
 
 # WANDB SWEEP
