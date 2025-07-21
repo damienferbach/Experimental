@@ -28,6 +28,7 @@ import functools
 
 # Try to import directly
 from nanogpt_minimal import ModelConfig, TextDataset, init_train_state, train_step, count_params, GPT
+from fineweb_dataset import FineWebDataset, create_fineweb_datasets
 import jax
 import jax.numpy as jnp
 import optimizers
@@ -116,158 +117,6 @@ def get_model_config(model_name: str) -> ModelConfig:
         available_models = ', '.join(GPT2_CONFIGS.keys())
         raise ValueError(f"Unknown model '{model_name}'. Available models: {available_models}")
     return GPT2_CONFIGS[model_name]
-
-class FineWebDataset:
-    """Dataset class that reads parquet files one at a time and tokenizes on-the-fly, similar to TextDataset"""
-    def __init__(self, parquet_files, max_tokens=None, is_validation=False):
-        self.parquet_files = parquet_files
-        self.max_tokens = max_tokens
-        self.is_validation = is_validation
-        self.enc = tiktoken.get_encoding("gpt2")
-        self.eot = self.enc._special_tokens['<|endoftext|>']
-        
-        logger.info(f"FineWebDataset initialized with {len(parquet_files)} parquet files")
-        
-        # For validation, load all data into memory for reuse
-        if is_validation:
-            logger.info("Loading all validation data into memory for reuse")
-            self._all_tokens = None
-            self._load_all_validation_data()
-    
-    def _load_all_validation_data(self):
-        """Load all validation data into memory efficiently"""
-        import numpy as np
-        
-        # Use numpy arrays for memory efficiency
-        token_chunks = []
-        total_tokens = 0
-        
-        for file_idx, parquet_file in enumerate(self.parquet_files):
-            logger.info(f"Loading validation file {file_idx+1}/{len(self.parquet_files)}: {os.path.basename(parquet_file)}")
-            
-            df = pd.read_parquet(parquet_file)
-            
-            for text in df['text']:
-                # Tokenize text
-                tokens = [self.eot]  # Start with end-of-text token
-                tokens.extend(self.enc.encode_ordinary(text))
-                
-                # Convert to numpy array with efficient dtype
-                token_array = np.array(tokens, dtype=np.int32)
-                token_chunks.append(token_array)
-                total_tokens += len(token_array)
-                
-                # Check max_tokens limit
-                if self.max_tokens and total_tokens >= self.max_tokens:
-                    logger.info(f"Reached validation max tokens limit: {self.max_tokens}")
-                    # Concatenate what we have so far
-                    self._all_tokens = np.concatenate(token_chunks, dtype=np.int32)
-                    # Trim to exact limit
-                    if len(self._all_tokens) > self.max_tokens:
-                        self._all_tokens = self._all_tokens[:self.max_tokens]
-                    del df
-                    return
-            
-            del df
-        
-        # Concatenate all token chunks into single array
-        if token_chunks:
-            self._all_tokens = np.concatenate(token_chunks, dtype=np.int32)
-        else:
-            self._all_tokens = np.array([], dtype=np.int32)
-        
-        logger.info(f"Loaded {len(self._all_tokens):,} validation tokens into memory ({self._all_tokens.nbytes / 1024 / 1024:.2f} MB)")
-        
-    def iterate_once(self, batch_size, seq_len):
-        """Iterator that yields batches of (x, y, w) similar to TextDataset"""
-        if self.is_validation:
-            # For validation, use preloaded data
-            return self._iterate_validation_data(batch_size, seq_len)
-        else:
-            # For training, process files one at a time
-            return self._iterate_training_data(batch_size, seq_len)
-    
-    def _iterate_validation_data(self, batch_size, seq_len):
-        """Iterate through preloaded validation data"""
-        import numpy as np
-        
-        if not hasattr(self, '_all_tokens') or len(self._all_tokens) == 0:
-            logger.warning("No validation data available")
-            return
-        
-        # Create batches from preloaded tokens
-        n = len(self._all_tokens)
-        num_batches = n // (batch_size * seq_len)
-        
-        if num_batches == 0:
-            logger.warning("Validation set too small for batch size and sequence length")
-            return
-        
-        # Trim to ensure even division into batches
-        tokens = self._all_tokens[:num_batches * batch_size * seq_len]
-        
-        # Reshape into batches
-        token_array = np.array(tokens).reshape(batch_size, -1)
-        
-        # Create input/target batches
-        for i in range(0, token_array.shape[1] - seq_len, seq_len):
-            x = token_array[:, i:i+seq_len]
-            y = token_array[:, i+1:i+seq_len+1]
-            w = np.ones_like(x, dtype=np.uint8)  # All tokens are valid
-            
-            yield jnp.array(x), jnp.array(y), jnp.array(w)
-    
-    def _iterate_training_data(self, batch_size, seq_len):
-        """Process training files one at a time"""
-        import numpy as np
-        
-        current_tokens = np.array([], dtype=np.int32)
-        tokens_yielded = 0
-        batch_size_tokens = batch_size * seq_len
-        
-        # Process one parquet file at a time (like the original)
-        for file_idx, parquet_file in enumerate(self.parquet_files):
-            logger.info(f"Processing parquet file {file_idx+1}/{len(self.parquet_files)}: {os.path.basename(parquet_file)}")
-            
-            # Load the current parquet file
-            df = pd.read_parquet(parquet_file)
-            logger.info(f"Loaded {len(df)} text documents from {os.path.basename(parquet_file)}")
-            
-            # Process each text document in the file
-            for text in df['text']:
-                # Tokenize text on-the-fly
-                tokens = [self.eot]  # Start with end-of-text token
-                tokens.extend(self.enc.encode_ordinary(text))
-                
-                # Convert to numpy array for efficiency
-                new_tokens = np.array(tokens, dtype=np.int32)
-                current_tokens = np.concatenate([current_tokens, new_tokens])
-                
-                # Yield batches when we have enough tokens
-                while len(current_tokens) >= batch_size_tokens + 1:
-                    # Extract batch
-                    batch_tokens = current_tokens[:batch_size_tokens + 1]
-                    current_tokens = current_tokens[batch_size_tokens:]
-                    
-                    # Convert to JAX arrays and reshape
-                    x = jnp.array(batch_tokens[:-1]).reshape(batch_size, seq_len)
-                    y = jnp.array(batch_tokens[1:]).reshape(batch_size, seq_len)
-                    w = jnp.ones_like(x)  # Dummy weights
-                    
-                    tokens_yielded += batch_size_tokens
-                    
-                    # Check max_tokens limit
-                    if self.max_tokens and tokens_yielded >= self.max_tokens:
-                        return
-                        
-                    yield x, y, w
-                
-                # Check max_tokens limit after processing each text
-                if self.max_tokens and tokens_yielded >= self.max_tokens:
-                    return
-            
-            # Free memory after processing each file
-            del df
 
 #From adamW_multi_gpu.py
 def _init_train_state_sharded(config, model, key, mesh):
@@ -644,24 +493,28 @@ def modify_nanogpt_for_fineweb():
     #TAMIA/MILA CLUSTER
     data_root = os.path.expanduser(DATA_ROOT)
 
-    parquet_files = sorted(glob.glob(os.path.join(data_root, "*_00000.parquet")))
+    # parquet_files = sorted(glob.glob(os.path.join(data_root, "*_00000.parquet")))
     
-    if not parquet_files:
-        raise ValueError(f"No parquet files found in {data_root}")
+    # if not parquet_files:
+    #     raise ValueError(f"No parquet files found in {data_root}")
         
-    logger.info(f"Found {len(parquet_files)} parquet files")
+    # logger.info(f"Found {len(parquet_files)} parquet files")
     
-    # Reserve the last file for validation, rest for training
-    val_files = parquet_files[-1:]
-    train_files = parquet_files[:-1]
+    # # Reserve the last file for validation, rest for training
+    # val_files = parquet_files[-1:]
+    # train_files = parquet_files[:-1]
     
-    logger.info(f"Using {len(train_files)} files for training")
-    logger.info(f"Using {len(val_files)} files for validation")
+    # logger.info(f"Using {len(train_files)} files for training")
+    # logger.info(f"Using {len(val_files)} files for validation")
     
-    # Initialize datasets
-    train_dataset = FineWebDataset(train_files)
-    val_dataset = FineWebDataset(val_files, max_tokens=config["val_max_tokens"], is_validation=True)
-    
+    # # Initialize datasets
+    # train_dataset = FineWebDataset(train_files)
+    # val_dataset = FineWebDataset(val_files, max_tokens=config["val_max_tokens"], is_validation=True)
+    train_dataset, val_dataset = create_fineweb_datasets(
+            data_root, 
+            val_max_tokens=config["val_max_tokens"],
+            val_files_count=1
+        )
     logger.info(f"Validation dataset limited to {config['val_max_tokens']:,} tokens")
     
     # Create training iterator
