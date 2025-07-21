@@ -620,7 +620,7 @@ def modify_nanogpt_for_fineweb():
     }
 
     DATA_ROOT     = pathlib.Path(config["data_root"])
-    CHECKPOINT_DIR = pathlib.Path(config["checkoint_dir"])
+    CHECKPOINT_DIR = pathlib.Path(config["checkpoint_dir"])
     
     # Create LOG_STEPS
     LOG_STEPS = jnp.unique(jnp.concatenate([
