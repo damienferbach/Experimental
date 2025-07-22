@@ -8,7 +8,7 @@
 #SBATCH --job-name=multi_gpu_tamia
 #SBATCH --output=logs/%x-%j.out
 #SBATCH --error=logs/%x-%j.err
-
+ 
 export NCCL_DEBUG=INFO
 export CLUSTER=tamia
 export WANDB_API_KEY=bece9f2099e3e85e0ae9922002616cf20bd26946
